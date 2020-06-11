@@ -1,0 +1,70 @@
+version: "3"
+
+services:
+  poll:
+    build: ./poll/
+    ports:
+      - "5000:80"
+    networks:
+      - poll-tier
+    links:
+      - redis
+    restart: always
+    environment:
+        - HOST=redis
+  result:
+    build: ./result/
+    ports:
+      - "5001:80"
+    networks:
+      - result-tier
+    links:
+      - db
+    depends_on:
+      - db
+    restart: always
+    environment:
+        - POSTGRES=postgres://postgres:password@db/postgres
+  worker:
+    build:
+      context: ./worker/
+    networks:
+      - back-tier
+    links:
+      - redis
+      - db
+    restart: always
+    environment:
+        - CONNECT_DB=db:5432
+  redis:
+    image: redis:5-alpine
+    expose:
+      - "6379"
+    networks:
+      - poll-tier
+      - back-tier
+    restart: always
+  db:
+    image: postgres:11.2-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=postgres
+    networks:
+      - result-tier
+      - back-tier
+    volumes:
+      - db-data:/var/lib/postgresql/data/
+    restart: always
+networks:
+  poll-tier:
+    driver: bridge
+  result-tier:
+    driver: bridge
+  back-tier:
+    driver: bridge
+volumes:
+  db-data:
+    driver: local
